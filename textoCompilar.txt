@@ -1,0 +1,3 @@
+gcc -g -pthread main.c listaLigada.c fila_lista_ligada.c -o a
+
+.\a.exe
