@@ -9,9 +9,9 @@
 #define MAX_VIAGENS 6
 #define CAPACIDADE_MAXIMA 6
 
-#define TEMPO_VIAGEM 1
+#define TEMPO_VIAGEM 5
 #define TEMPO_EMBARQUE_DESEMBARQUE 1
-#define TEMPO_POR_PESSOA_NOVA 2
+#define TEMPO_POR_PESSOA_NOVA 1
 
 pthread_mutex_t lockFilaVip;
 pthread_mutex_t lockFilaTradicional;
