@@ -6,8 +6,12 @@
 #include <time.h>
 #include "fila_lista_ligada.h"
 
-#define MAX_VIAGENS 5
-#define CAPACIDADE_MAXIMA 4
+#define MAX_VIAGENS 6
+#define CAPACIDADE_MAXIMA 6
+
+#define TEMPO_VIAGEM 1
+#define TEMPO_EMBARQUE_DESEMBARQUE 1
+#define TEMPO_POR_PESSOA_NOVA 2
 
 pthread_mutex_t lockFilaVip;
 pthread_mutex_t lockFilaTradicional;
@@ -27,15 +31,15 @@ volatile int carroRodando = 0;
 void carregar(int viagemAtual)
 {
     //printf("\n-------------------------------------------------\n\nViagem #%d vai comecar, hora de embarcar!\n", viagemAtual);
-    sleep(1);
+    sleep(0.1);
 }
 void rodar()
 {
     //printf("O carro esta cheio, hora de rodar!\n");
-    sleep(1);
+    sleep(0.1);
     carroRodando = 1;
     //printf("O carro esta na montanha russa!\n");
-    sleep(6);
+    sleep(TEMPO_VIAGEM);
     carroRodando = 0;
 }
 void descarregar()
@@ -46,21 +50,20 @@ void descarregar()
 void embarcar(int embarcados)
 {
     //printf("%d passageiros embarcaram no carro...\n", embarcados);
-    sleep(1);
+    sleep(TEMPO_EMBARQUE_DESEMBARQUE);
 }
 void desembarcar(int embarcados)
 {
     //printf("%d passageiros desembarcaram do carro...\n", CAPACIDADE_MAXIMA - embarcados);
-    sleep(1);
+    sleep(TEMPO_EMBARQUE_DESEMBARQUE);
 }
 
 void imprimirFilas(Fila *filaVip, Fila *filaTradicional) {
-    pthread_mutex_lock(&lockFilaVip);
-    pthread_mutex_lock(&lockFilaTradicional);
-
+    
     int *vip = getFila(filaVip);
     int *tradicional = getFila(filaTradicional);
 
+    //pthread_mutex_lock(&lockFilaVip);
     printf("Fila VIP: [ ");
     for (int i = 0; i < filaVip->qtde; i++) {
         printf("%d", vip[i]);
@@ -68,7 +71,9 @@ void imprimirFilas(Fila *filaVip, Fila *filaTradicional) {
             printf(", ");
     }
     printf(" ]\n");
+    //pthread_mutex_unlock(&lockFilaVip);
 
+    //pthread_mutex_lock(&lockFilaTradicional);
     printf("Fila Tradicional: [ ");
     for (int i = 0; i < filaTradicional->qtde; i++) {
         printf("%d", tradicional[i]);
@@ -76,20 +81,22 @@ void imprimirFilas(Fila *filaVip, Fila *filaTradicional) {
             printf(", ");
     }
     printf(" ]\n");
+    //pthread_mutex_unlock(&lockFilaTradicional);
 
     free(vip);
     free(tradicional);
 
-    pthread_mutex_unlock(&lockFilaTradicional);
-    pthread_mutex_unlock(&lockFilaVip);
 }
 
-void *monitorVisual()
+void *monitorVisual(void *arg)
 {
     while (continuarRodando)
     {
+        printf("\033[2J\033[H");
+        fflush(stdout);
+
         // Simula limpar a tela imprimindo muitas linhas em branco
-        for (int i = 0; i < 50; i++) printf("\n");
+        // for (int i = 0; i < 50; i++) printf("\n");
 
         printf("=========== PARQUE DE DIVERSOES ===========\n");
 
@@ -112,24 +119,7 @@ void *monitorVisual()
         // Funcionario produtor que coloca pessoas na fila
         printf("\nFuncionario (entrada de passageiros): [ PRODUTOR 1 ]\n");
 
-        // Mostrar filas
-        pthread_mutex_lock(&lockFilaVip);
-        pthread_mutex_lock(&lockFilaTradicional);
-
-        printf("\nFila VIP: ");
-        for (int i = 0; i < filaVip->qtde; i++) {
-            printf("|O| ");
-        }
-        if (filaVip->qtde == 0) printf("[vazia]");
-
-        printf("\nFila Tradicional: ");
-        for (int i = 0; i < filaTradicional->qtde; i++) {
-            printf("|o| ");
-        }
-        if (filaTradicional->qtde == 0) printf("[vazia]");
-
-        pthread_mutex_unlock(&lockFilaTradicional);
-        pthread_mutex_unlock(&lockFilaVip);
+        imprimirFilas(filaVip, filaTradicional);
 
         // Funcionario consumidor que coordena o embarque
         printf("\n\nFuncionario (embarque no carro): [ PRODUTOR 2 ]\n");
@@ -143,13 +133,14 @@ void *monitorVisual()
 
         printf("\n===========================================\n");
 
-        sleep(1); // Atualiza o estado a cada 1 segundo
+        usleep(100000);
+        //printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
     }
 
     return NULL;
 }
 
-void *threadCarro()
+void *threadCarro(void *arg)
 {
     int viagemAtual = 0;
 
@@ -179,7 +170,7 @@ void *threadCarro()
     return NULL;
 }
 
-void *funcionarioConsumidor()
+void *funcionarioConsumidor(void *arg)
 {
     while (1)
     {
@@ -195,6 +186,8 @@ void *funcionarioConsumidor()
 
             if (embarcados % 2 == 0)
             {
+                pthread_mutex_lock(&lockFilaVip);
+                    
                 if (FilaVazia(filaVip))
                 {
                     pthread_mutex_lock(&lockFilaTradicional);
@@ -204,14 +197,16 @@ void *funcionarioConsumidor()
                 }
                 else
                 {
-                    pthread_mutex_lock(&lockFilaVip);
                     removeFila(filaVip);
                     embarcar(embarcados);
-                    pthread_mutex_unlock(&lockFilaVip);
                 }
+
+                pthread_mutex_unlock(&lockFilaVip);
             }
             else
             {
+                pthread_mutex_lock(&lockFilaTradicional);
+
                 if (FilaVazia(filaTradicional))
                 {
                     pthread_mutex_lock(&lockFilaVip);
@@ -221,11 +216,12 @@ void *funcionarioConsumidor()
                 }
                 else
                 {
-                    pthread_mutex_lock(&lockFilaTradicional);
+                    
                     removeFila(filaTradicional);
                     embarcar(embarcados);
-                    pthread_mutex_unlock(&lockFilaTradicional);
                 }
+
+                pthread_mutex_unlock(&lockFilaTradicional);
             }
 
             if (embarcados == CAPACIDADE_MAXIMA)
@@ -246,7 +242,7 @@ void *funcionarioConsumidor()
     return NULL;
 }
 
-void *funcionarioProdutor()
+void *funcionarioProdutor(void *arg)
 {
     int idPassageiro = 0;
     while (1)
@@ -266,11 +262,9 @@ void *funcionarioProdutor()
             insereFila(filaTradicional, idPassageiro);
             pthread_mutex_unlock(&lockFilaTradicional);
         }
-        
-        //imprimirFilas(filaVip, filaTradicional);
 
         sem_post(&passageirosAguardando);
-        sleep(1.5);
+        sleep(TEMPO_POR_PESSOA_NOVA);
     }
     return NULL;
 }
